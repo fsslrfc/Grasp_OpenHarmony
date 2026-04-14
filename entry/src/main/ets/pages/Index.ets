@@ -1,7 +1,6 @@
 import connection from '@ohos.net.connection';
 import promptAction from '@ohos.promptAction';
 import router from '@ohos.router';
-import { tcpClientService } from '../common/TcpClient';
 
 interface LinkAddressCompat {
   address?: {
@@ -21,13 +20,19 @@ interface ConnectionApiCompat {
     callback: (err: unknown, properties: ConnectionPropertiesCompat) => void) => void;
 }
 
+interface OperationPageParams {
+  controlUrl: string;
+  host: string;
+  port: string;
+}
+
 @Entry
 @Component
 struct Index {
   @State private deviceIp: string = '当前设备 IP：获取中...';
-  @State private serverIp: string = '';
-  @State private serverPort: string = '';
-  @State private isConnecting: boolean = false;
+  @State private serverIp: string = '10.109.10.223';
+  @State private serverPort: string = '5000';
+  @State private isOpening: boolean = false;
 
   aboutToAppear(): void {
     this.loadDeviceIp();
@@ -96,27 +101,35 @@ struct Index {
     }
   }
 
-  private connectToServer(): void {
+  private buildControlUrl(ip: string, port: number): string {
+    return `http://${ip}:${port}/`;
+  }
+
+  private openControlPage(): void {
     const ip = this.serverIp.trim();
     const port = Number(this.serverPort.trim());
 
     if (!ip || !Number.isInteger(port) || port < 1 || port > 65535) {
-      this.showToast('请输入正确的 IP 和端口');
+      this.showToast('请输入正确的上位机 IP 和端口');
       return;
     }
 
-    this.isConnecting = true;
-    tcpClientService.connect(ip, port, 5000)
-      .then(() => {
-        this.isConnecting = false;
-        router.pushUrl({ url: 'pages/OperationPage' });
-      })
-      .catch(() => {
-        this.isConnecting = false;
-        tcpClientService.disconnect().catch(() => {
-        });
-        this.showToast('连接失败，请检查网络与服务端');
-      });
+    this.isOpening = true;
+    const params: OperationPageParams = {
+      controlUrl: this.buildControlUrl(ip, port),
+      host: ip,
+      port: `${port}`
+    };
+
+    Promise.resolve(router.pushUrl({
+      url: 'pages/OperationPage',
+      params: params
+    })).then(() => {
+      this.isOpening = false;
+    }).catch(() => {
+      this.isOpening = false;
+      this.showToast('打开操作台失败，请检查页面配置');
+    });
   }
 
   build() {
@@ -127,47 +140,71 @@ struct Index {
         .width('100%')
         .textAlign(TextAlign.Center)
 
+      Text('下位机仅负责加载上位机视觉操作台页面')
+        .fontSize(15)
+        .fontColor('#4B5563')
+        .width('100%')
+        .textAlign(TextAlign.Center)
+
       Text(this.deviceIp)
         .fontSize(14)
         .fontColor('#666666')
         .width('100%')
         .textAlign(TextAlign.Center)
-        .margin({ top: 20, bottom: 20 })
+        .margin({ top: 8, bottom: 12 })
 
-      Row({ space: 12 }) {
-        TextInput({ placeholder: '上位机 IP', text: this.serverIp })
-          .width('62%')
-          .height(48)
-          .backgroundColor('#FFFFFF')
-          .borderRadius(12)
-          .padding({ left: 12, right: 12 })
-          .onChange((value: string) => {
-            this.serverIp = value;
-          })
+      Column({ space: 14 }) {
+        Text('上位机地址')
+          .width('100%')
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#1F2937')
 
-        TextInput({ placeholder: '端口', text: this.serverPort })
-          .type(InputType.Number)
-          .width('26%')
-          .height(48)
-          .backgroundColor('#FFFFFF')
-          .borderRadius(12)
-          .padding({ left: 12, right: 12 })
-          .onChange((value: string) => {
-            this.serverPort = value;
-          })
+        Row({ space: 12 }) {
+          TextInput({ placeholder: '上位机 IP', text: this.serverIp })
+            .width('62%')
+            .height(48)
+            .backgroundColor('#FFFFFF')
+            .borderRadius(12)
+            .padding({ left: 12, right: 12 })
+            .onChange((value: string) => {
+              this.serverIp = value;
+            })
+
+          TextInput({ placeholder: '端口', text: this.serverPort })
+            .type(InputType.Number)
+            .width('26%')
+            .height(48)
+            .backgroundColor('#FFFFFF')
+            .borderRadius(12)
+            .padding({ left: 12, right: 12 })
+            .onChange((value: string) => {
+              this.serverPort = value;
+            })
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+
+        Text('默认访问 `http://上位机IP:端口/`，页面内的视频、识别结果和点击交互均由上位机统一处理。')
+          .fontSize(13)
+          .fontColor('#6B7280')
+          .width('100%')
+          .lineHeight(20)
       }
       .width('100%')
-      .justifyContent(FlexAlign.Center)
+      .padding(18)
+      .backgroundColor('#EEF2FF')
+      .borderRadius(18)
 
-      Button(this.isConnecting ? '连接中...' : '连接')
+      Button(this.isOpening ? '打开中...' : '打开操作台')
         .width(220)
         .height(48)
         .fontSize(18)
         .fontWeight(FontWeight.Medium)
         .borderRadius(24)
-        .enabled(!this.isConnecting)
+        .enabled(!this.isOpening)
         .onClick(() => {
-          this.connectToServer();
+          this.openControlPage();
         })
     }
     .width('100%')
