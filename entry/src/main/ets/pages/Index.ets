@@ -32,7 +32,7 @@ interface OperationPageParams {
 @Component
 struct Index {
   @State private deviceIp: string = '当前设备 IP：获取中...';
-  @State private serverIp: string = '10.10.10.123';
+  @State private serverIp: string = '10.118.123.223';
   @State private serverPort: string = '5000';
   @State private armIp: string = '10.0.0.101';
   @State private armPort: string = '2000';

@@ -104,11 +104,11 @@ class RobotArmClientService {
     await this.safeCloseClient(currentClient);
   }
 
-  async send(scriptCmd: string): Promise<void> {
+  async send(scriptCmd: string, isCommand: boolean = true): Promise<void> {
     if (!this.client || !this.connected) {
       throw new Error('机械臂未连接');
     }
-    const payload = `<start>${scriptCmd}<end>`;
+    const payload = isCommand ? `<start>${scriptCmd}<end>` : scriptCmd;
     await this.client.send({ data: payload });
   }
 

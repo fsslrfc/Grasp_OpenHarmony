@@ -18,7 +18,6 @@ struct OperationPage {
   @State private pageHint: string = '正在准备上位机操作台...';
   @State private armConnected: boolean = false;
   @State private gripperState: boolean = false;
-
   private readonly webController: webview.WebviewController = new webview.WebviewController();
 
   aboutToAppear(): void {
@@ -59,12 +58,12 @@ struct OperationPage {
     }
   }
 
-  private sendArmCommand(scriptCmd: string): void {
+  private sendArmCommand(scriptCmd: string, isCommand: boolean = true): void {
     if (!robotArmClient.isConnected()) {
       this.showToast('机械臂未连接');
       return;
     }
-    robotArmClient.send(scriptCmd).then(() => {
+    robotArmClient.send(scriptCmd, isCommand).then(() => {
       this.showToast(`已发送: ${scriptCmd}`);
     }).catch(() => {
       this.showToast('发送指令失败');
@@ -143,12 +142,81 @@ struct OperationPage {
             this.webController.refresh();
             this.showToast('已请求刷新页面');
           })
+
+        Button('断开机械臂')
+          .layoutWeight(1)
+          .height(46)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#FFFFFF')
+          .borderRadius(23)
+          .backgroundColor('#EF4444')
+          .onClick(async () => {
+            try {
+              await robotArmClient.disconnect();
+            } catch (_err) {
+            }
+            this.armConnected = false;
+            this.showToast('已断开与机械臂的连接');
+          })
       }
       .width('100%')
       .padding({ left: 20, right: 20, bottom: 8 })
 
       if (this.armConnected) {
         Row({ space: 12 }) {
+          Button('机械臂上电')
+            .layoutWeight(1)
+            .height(46)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+            .borderRadius(23)
+            .backgroundColor('#F59E0B')
+            .onClick(() => {
+              this.sendArmCommand(`poweron`, false);
+            })
+
+          Button('机械臂上使能')
+            .layoutWeight(1)
+            .height(46)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+            .borderRadius(23)
+            .backgroundColor('#10B981')
+            .onClick(() => {
+              this.sendArmCommand(`enable`, false);
+            })
+
+          Button('机械臂下电')
+            .layoutWeight(1)
+            .height(46)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+            .borderRadius(23)
+            .backgroundColor('#EF4444')
+            .onClick(() => {
+              this.sendArmCommand(`poweroff`, false);
+            })
+        }
+        .width('100%')
+        .padding({ left: 20, right: 20, bottom: 8 })
+
+        Row({ space: 12 }) {
+          Button('夹爪初始化')
+            .layoutWeight(1)
+            .height(46)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+            .borderRadius(23)
+            .backgroundColor('#6B7280')
+            .onClick(() => {
+              this.sendArmCommand(`write_raw_data_485({1, 6, 1, 0, 0, 1, 73, -10})`);
+            })
+
           Button('夹爪闭合')
             .layoutWeight(1)
             .height(46)
@@ -158,7 +226,6 @@ struct OperationPage {
             .borderRadius(23)
             .backgroundColor('#F59E0B')
             .onClick(() => {
-              this.gripperState = true;
               this.sendArmCommand(`write_raw_data_485({1, 6, 1, 3, 0, 0, 120, 54})`);
             })
 
@@ -171,25 +238,7 @@ struct OperationPage {
             .borderRadius(23)
             .backgroundColor('#10B981')
             .onClick(() => {
-              this.gripperState = false;
               this.sendArmCommand(`write_raw_data_485({1, 6, 1, 3, 3, -24, 120, -120})`);
-            })
-
-          Button('断开机械臂')
-            .layoutWeight(1)
-            .height(46)
-            .fontSize(16)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#FFFFFF')
-            .borderRadius(23)
-            .backgroundColor('#EF4444')
-            .onClick(async () => {
-              try {
-                await robotArmClient.disconnect();
-              } catch (_err) {
-              }
-              this.armConnected = false;
-              this.showToast('已断开与机械臂的连接');
             })
         }
         .width('100%')
