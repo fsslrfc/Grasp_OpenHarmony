@@ -1,6 +1,7 @@
 import connection from '@ohos.net.connection';
 import promptAction from '@ohos.promptAction';
 import router from '@ohos.router';
+import { robotArmClient } from '../common/RobotArmClient';
 
 interface LinkAddressCompat {
   address?: {
@@ -24,15 +25,20 @@ interface OperationPageParams {
   controlUrl: string;
   host: string;
   port: string;
+  armConnected: boolean;
 }
 
 @Entry
 @Component
 struct Index {
   @State private deviceIp: string = '当前设备 IP：获取中...';
-  @State private serverIp: string = '10.109.10.223';
+  @State private serverIp: string = '10.10.10.123';
   @State private serverPort: string = '5000';
+  @State private armIp: string = '10.0.0.101';
+  @State private armPort: string = '2000';
   @State private isOpening: boolean = false;
+  @State private isArmConnecting: boolean = false;
+  @State private isArmConnected: boolean = false;
 
   aboutToAppear(): void {
     this.loadDeviceIp();
@@ -118,7 +124,8 @@ struct Index {
     const params: OperationPageParams = {
       controlUrl: this.buildControlUrl(ip, port),
       host: ip,
-      port: `${port}`
+      port: `${port}`,
+      armConnected: this.isArmConnected
     };
 
     Promise.resolve(router.pushUrl({
@@ -132,17 +139,47 @@ struct Index {
     });
   }
 
+  private async toggleArmConnection(): Promise<void> {
+    if (this.isArmConnected) {
+      try {
+        await robotArmClient.disconnect();
+      } catch (_err) {
+      }
+      this.isArmConnected = false;
+      this.showToast('已断开与机械臂的连接');
+      return;
+    }
+
+    const ip = this.armIp.trim();
+    const port = Number(this.armPort.trim());
+
+    if (!ip || !Number.isInteger(port) || port < 1 || port > 65535) {
+      this.showToast('请输入正确的机械臂 IP 和端口');
+      return;
+    }
+
+    if (this.isArmConnecting) {
+      return;
+    }
+
+    this.isArmConnecting = true;
+    try {
+      await robotArmClient.connect(ip, port);
+      this.isArmConnected = true;
+      this.showToast('成功连接到机械臂');
+    } catch (_err) {
+      this.isArmConnected = false;
+      this.showToast('连接机械臂失败，请检查 IP 和端口');
+    } finally {
+      this.isArmConnecting = false;
+    }
+  }
+
   build() {
     Column({ space: 20 }) {
       Text('机械臂客户端')
         .fontSize(40)
         .fontWeight(FontWeight.Bold)
-        .width('100%')
-        .textAlign(TextAlign.Center)
-
-      Text('下位机仅负责加载上位机视觉操作台页面')
-        .fontSize(15)
-        .fontColor('#4B5563')
         .width('100%')
         .textAlign(TextAlign.Center)
 
@@ -184,28 +221,77 @@ struct Index {
         }
         .width('100%')
         .justifyContent(FlexAlign.Center)
-
-        Text('默认访问 `http://上位机IP:端口/`，页面内的视频、识别结果和点击交互均由上位机统一处理。')
-          .fontSize(13)
-          .fontColor('#6B7280')
-          .width('100%')
-          .lineHeight(20)
       }
       .width('100%')
       .padding(18)
       .backgroundColor('#EEF2FF')
       .borderRadius(18)
 
-      Button(this.isOpening ? '打开中...' : '打开操作台')
-        .width(220)
-        .height(48)
-        .fontSize(18)
-        .fontWeight(FontWeight.Medium)
-        .borderRadius(24)
-        .enabled(!this.isOpening)
-        .onClick(() => {
-          this.openControlPage();
-        })
+      Column({ space: 14 }) {
+        Text('机械臂地址')
+          .width('100%')
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#1F2937')
+
+        Row({ space: 12 }) {
+          TextInput({ placeholder: '机械臂 IP', text: this.armIp })
+            .width('62%')
+            .height(48)
+            .backgroundColor('#FFFFFF')
+            .borderRadius(12)
+            .padding({ left: 12, right: 12 })
+            .onChange((value: string) => {
+              this.armIp = value;
+            })
+
+          TextInput({ placeholder: '端口', text: this.armPort })
+            .type(InputType.Number)
+            .width('26%')
+            .height(48)
+            .backgroundColor('#FFFFFF')
+            .borderRadius(12)
+            .padding({ left: 12, right: 12 })
+            .onChange((value: string) => {
+              this.armPort = value;
+            })
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+      }
+      .width('100%')
+      .padding(18)
+      .backgroundColor('#FFF7ED')
+      .borderRadius(18)
+
+      Row({ space: 12 }) {
+        Button(this.isArmConnecting ? '连接中...' : (this.isArmConnected ? '断开机械臂' : '连接机械臂'))
+          .layoutWeight(1)
+          .height(48)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#FFFFFF')
+          .borderRadius(24)
+          .backgroundColor(this.isArmConnecting ? '#9CA3AF' : (this.isArmConnected ? '#EF4444' : '#F59E0B'))
+          .enabled(!this.isArmConnecting)
+          .onClick(() => {
+            this.toggleArmConnection();
+          })
+
+        Button(this.isOpening ? '打开中...' : '打开操作台')
+          .layoutWeight(1)
+          .height(48)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#FFFFFF')
+          .borderRadius(24)
+          .backgroundColor('#2563EB')
+          .enabled(!this.isOpening)
+          .onClick(() => {
+            this.openControlPage();
+          })
+      }
+      .width('100%')
     }
     .width('100%')
     .height('100%')

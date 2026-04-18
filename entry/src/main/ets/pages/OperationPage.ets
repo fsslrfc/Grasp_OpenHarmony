@@ -1,11 +1,13 @@
 import promptAction from '@ohos.promptAction';
 import router from '@ohos.router';
 import webview from '@ohos.web.webview';
+import { robotArmClient } from '../common/RobotArmClient';
 
 interface OperationPageParams {
   controlUrl?: string;
   host?: string;
   port?: string;
+  armConnected?: boolean;
 }
 
 @Entry
@@ -14,6 +16,8 @@ struct OperationPage {
   @State private controlUrl: string = '';
   @State private hostLabel: string = '';
   @State private pageHint: string = '正在准备上位机操作台...';
+  @State private armConnected: boolean = false;
+  @State private gripperState: boolean = false;
 
   private readonly webController: webview.WebviewController = new webview.WebviewController();
 
@@ -26,6 +30,7 @@ struct OperationPage {
     this.controlUrl = url;
     this.hostLabel = host && port ? `${host}:${port}` : url;
     this.pageHint = url ? '正在加载上位机操作台...' : '未获取到上位机地址，请返回首页重新输入';
+    this.armConnected = typeof params?.armConnected === 'boolean' ? params.armConnected : false;
   }
 
   private normalizeUrl(url: string): string {
@@ -52,6 +57,18 @@ struct OperationPage {
     } catch (_err) {
       this.showToast('返回失败');
     }
+  }
+
+  private sendArmCommand(scriptCmd: string): void {
+    if (!robotArmClient.isConnected()) {
+      this.showToast('机械臂未连接');
+      return;
+    }
+    robotArmClient.send(scriptCmd).then(() => {
+      this.showToast(`已发送: ${scriptCmd}`);
+    }).catch(() => {
+      this.showToast('发送指令失败');
+    });
   }
 
   build() {
@@ -128,7 +145,56 @@ struct OperationPage {
           })
       }
       .width('100%')
-      .padding({ left: 20, right: 20, bottom: 24 })
+      .padding({ left: 20, right: 20, bottom: 8 })
+
+      if (this.armConnected) {
+        Row({ space: 12 }) {
+          Button('夹爪闭合')
+            .layoutWeight(1)
+            .height(46)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+            .borderRadius(23)
+            .backgroundColor('#F59E0B')
+            .onClick(() => {
+              this.gripperState = true;
+              this.sendArmCommand(`write_raw_data_485({1, 6, 1, 3, 0, 0, 120, 54})`);
+            })
+
+          Button('夹爪张开')
+            .layoutWeight(1)
+            .height(46)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+            .borderRadius(23)
+            .backgroundColor('#10B981')
+            .onClick(() => {
+              this.gripperState = false;
+              this.sendArmCommand(`write_raw_data_485({1, 6, 1, 3, 3, -24, 120, -120})`);
+            })
+
+          Button('断开机械臂')
+            .layoutWeight(1)
+            .height(46)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+            .borderRadius(23)
+            .backgroundColor('#EF4444')
+            .onClick(async () => {
+              try {
+                await robotArmClient.disconnect();
+              } catch (_err) {
+              }
+              this.armConnected = false;
+              this.showToast('已断开与机械臂的连接');
+            })
+        }
+        .width('100%')
+        .padding({ left: 20, right: 20, bottom: 24 })
+      }
     }
     .width('100%')
     .height('100%')
