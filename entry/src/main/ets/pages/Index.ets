@@ -26,6 +26,8 @@ interface OperationPageParams {
   host: string;
   port: string;
   armConnected: boolean;
+  armIp: string;
+  armPort: string;
 }
 
 @Entry
@@ -42,6 +44,7 @@ struct Index {
 
   aboutToAppear(): void {
     this.loadDeviceIp();
+    this.isArmConnected = robotArmClient.isConnected();
   }
 
   private loadDeviceIp(): void {
@@ -125,7 +128,9 @@ struct Index {
       controlUrl: this.buildControlUrl(ip, port),
       host: ip,
       port: `${port}`,
-      armConnected: this.isArmConnected
+      armConnected: this.isArmConnected,
+      armIp: this.armIp.trim(),
+      armPort: this.armPort.trim()
     };
 
     Promise.resolve(router.pushUrl({
